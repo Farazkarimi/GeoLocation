@@ -9,4 +9,8 @@ RCT_EXTERN_METHOD(multiply:(float)a withB:(float)b
  RCT_EXTERN_METHOD(getLocation:(float)a withB:(float)b
                    withResolver:(RCTPromiseResolveBlock)resolve
                    withRejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(getServerResponse:(NSString)token withOffline:(BOOL) offline withTimeInterval: (Double)timeInterval
+                  withResolver:(RCTPromiseResolveBlock)resolve
+                  withRejecter:(RCTPromiseRejectBlock)reject)
 @end
