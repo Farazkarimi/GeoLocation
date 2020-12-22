@@ -4,9 +4,7 @@ import UserNotifications
 
 @objc(Geolocation)
 class Geolocation: NSObject {
-    var locationManager = CLLocationManager()
-    @objc var emitter = RCTEventEmitter()
-    
+    let reachability = try! Reachability()
     override init() {
         super.init()
     }
@@ -14,35 +12,81 @@ class Geolocation: NSObject {
     @objc(configure:withOffline:withTimeInterval:withToken:)
     func configure(url: String, offline: Bool, timeInterval: Double, token: String) {
         GeoLocationManager.setup(.init(url: url, offline: offline, timeInterval: timeInterval, token: token))
-        GeoLocationManager.shared.onServerResponsed = { [weak self] result in
-            guard let self = self else { return }
-            self.emitter.sendEvent(withName: "onLocationChanged", body: result)
-        }
     }
     
-    @objc(start:)
-    func start(resolver: RCTPromiseResolveBlock) {
+    @objc(start:withRejecter:)
+    func start(resolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) {
         let isStarted = GeoLocationManager.shared.start()
-        resolver(isStarted)
+        if isStarted { resolver(true) } else { rejecter("404", "Location is not available", nil) }
     }
     
-    @objc(stop:)
-    func stop(resolver: RCTPromiseResolveBlock) {
+    @objc(stop:withRejecter:)
+    func stop(resolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) {
         GeoLocationManager.shared.stop()
         resolver(true)
     }
     
-    @objc(getExplicitLocation:)
-    func getExplicitLocation(resolver: RCTPromiseResolveBlock) {
-       resolver(GeoLocationManager.shared.getCurrentLocation())
+    @objc(getExplicitLocation:withRejecter:)
+    func getExplicitLocation(resolver: RCTPromiseResolveBlock, rejecter: RCTPromiseRejectBlock) {
+        let location = GeoLocationManager.shared.getCurrentLocation()
+        if let location = location {
+            resolver(location)
+        }else {
+            rejecter("404", "Location is not available", nil)
+        }
     }
     
     @objc(setConfig:)
     func setConfig(timeInterval: Double) {
         GeoLocationManager.setTimeInterval(timeInterval: timeInterval)
     }
-}
+    
+    @objc(locationChangeListener:)
+    func locationChangeListener(emitter: RCTEventEmitter) {
+        GeoLocationManager.shared.onServerResponsed = { result in
+            emitter.sendEvent(withName: "location:change", body: result)
+        }
+    }
+    
+    @objc(networkChangeListener:)
+    func networkChangeListener(emitter: RCTEventEmitter) {
+        reachability.whenReachable = { reachability in
+            if reachability.connection == .wifi {
+                print("Reachable via WiFi")
+                emitter.sendEvent(withName: "isNetworkConnected", body: true)
+            } else {
+                emitter.sendEvent(withName: "isNetworkConnected", body: true)
+                print("Reachable via Cellular")
+            }
+        }
+        reachability.whenUnreachable = { _ in
+            print("Not reachable")
+            emitter.sendEvent(withName: "isNetworkConnected", body: false)
+        }
 
+        do {
+            try reachability.startNotifier()
+        } catch {
+            print("Unable to start notifier")
+        }
+    }
+    
+    @objc(locationFailedListener:)
+    func locationStatusListener(emitter: RCTEventEmitter) {
+        GeoLocationManager.shared.self.onLocationStatusChanged = { [weak emitter] status in
+            switch status {
+            case .success:
+                emitter?.sendEvent(withName: "location:on:fail'", body: "failed")
+            case .failed:
+                emitter?.sendEvent(withName: "location:on:fail'", body: "success")
+            }
+        }
+    }
+}
+enum LocationStatus {
+    case success
+    case failed
+}
 class GeoLocationManager: NSObject {
     
     static let shared = GeoLocationManager()
@@ -58,6 +102,7 @@ class GeoLocationManager: NSObject {
     private let token: String
     
     var onServerResponsed: (String) -> () = { _ in }
+    var onLocationStatusChanged: (_ status: LocationStatus) -> () = { _ in }
     
     struct Config {
         let url: String
@@ -93,6 +138,7 @@ class GeoLocationManager: NSObject {
         switch CLLocationManager.authorizationStatus() {
         
         case .notDetermined, .restricted, .denied:
+            self.onLocationStatusChanged(.failed)
             return false
         case .authorizedWhenInUse, .authorizedAlways,.authorized:
             UIDevice.current.isBatteryMonitoringEnabled = true
@@ -117,17 +163,21 @@ class GeoLocationManager: NSObject {
                 self.timerValue = 0
                 self.request(with: self.url, offline: false, lat: lat, long: long, completion: { [weak self] result in
                     guard let self = self else { return }
+                    self.onLocationStatusChanged(.success)
                     self.onServerResponsed(result)
                 })
                 //}
             }
             return true
         default:
+            self.onLocationStatusChanged(.failed)
             return false
         }
     }
     
     func stop() {
+        self.timer?.invalidate()
+        self.timer = nil
         locationManager?.delegate = nil
         locationManager = nil
     }
@@ -148,13 +198,16 @@ class GeoLocationManager: NSObject {
            do {
                let jsonData = try JSONSerialization.data(withJSONObject: jsonObject, options: JSONSerialization.WritingOptions()) as NSData
                let jsonString = NSString(data: jsonData as Data, encoding: String.Encoding.utf8.rawValue)! as String
+            self.onLocationStatusChanged(.success)
             return jsonString
          
            } catch _ {
+            self.onLocationStatusChanged(.failed)
                print ("JSON Failure")
             return nil
            }
         }
+        self.onLocationStatusChanged(.failed)
         return nil
     }
     
