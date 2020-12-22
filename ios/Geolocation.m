@@ -8,5 +8,4 @@ RCT_EXTERN_METHOD(start: (RCTPromiseResolveBlock)resolver withRejecter: (RCTProm
 RCT_EXTERN_METHOD(stop: (RCTPromiseResolveBlock)resolver withRejecter: (RCTPromiseRejectBlock)rejecter)
 RCT_EXTERN_METHOD(getExplicitLocation: (RCTPromiseResolveBlock)resolver withRejecter: (RCTPromiseRejectBlock)rejecter)
 RCT_EXTERN_METHOD(setConfig: (Double)timeInterval)
-RCT_EXTERN_METHOD(locationChangeListener: (RCTEventEmitter)emitter)
 @end
