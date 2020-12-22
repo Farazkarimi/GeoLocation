@@ -5,45 +5,42 @@ import UserNotifications
 @objc(Geolocation)
 class Geolocation: NSObject {
     var locationManager = CLLocationManager()
+    @objc var emitter = RCTEventEmitter()
+    
     override init() {
         super.init()
     }
-
-     @objc(getLocation:)
-     func getLocation(emitter: RCTEventEmitter) -> Void {
-         locationManager.requestWhenInUseAuthorization()
-         var currentLoc: CLLocation!
-         if(CLLocationManager.authorizationStatus() == .authorizedWhenInUse ||
-         CLLocationManager.authorizationStatus() == .authorizedAlways) {
-            currentLoc = locationManager.location
-            print(currentLoc.coordinate.latitude)
-            print(currentLoc.coordinate.longitude)
-            
-            let jsonObject: [String: Any] = [
-                "lat": currentLoc.coordinate.longitude,
-                "lng": currentLoc.coordinate.latitude,
-            ]
-            
-            do {
-                let jsonData = try JSONSerialization.data(withJSONObject: jsonObject, options: JSONSerialization.WritingOptions()) as NSData
-                let jsonString = NSString(data: jsonData as Data, encoding: String.Encoding.utf8.rawValue)! as String
-                emitter.sendEvent(withName: "JsonResponse", body: jsonString)
-          
-            } catch _ {
-                print ("JSON Failure")
-            }
-            
-         }
-     }
     
-    @objc(getServerResponse:withToken:withOffline:withTimeInterval:withResolver:withRejecter:)
-    func getServerResponse(url: String, token: String, offline: Bool, timeInterval: Double, resolve:@escaping  RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
+    @objc(configure:withOffline:withTimeInterval:withToken:)
+    func configure(url: String, offline: Bool, timeInterval: Double, token: String) {
         GeoLocationManager.setup(.init(url: url, offline: offline, timeInterval: timeInterval, token: token))
-        GeoLocationManager.shared.onServerResponsed = { result in
-            resolve(result)
+        GeoLocationManager.shared.onServerResponsed = { [weak self] result in
+            guard let self = self else { return }
+            self.emitter.sendEvent(withName: "onLocationChanged", body: result)
         }
     }
     
+    @objc(start:)
+    func start(resolver: RCTPromiseResolveBlock) {
+        let isStarted = GeoLocationManager.shared.start()
+        resolver(isStarted)
+    }
+    
+    @objc(stop:)
+    func stop(resolver: RCTPromiseResolveBlock) {
+        GeoLocationManager.shared.stop()
+        resolver(true)
+    }
+    
+    @objc(getExplicitLocation:)
+    func getExplicitLocation(resolver: RCTPromiseResolveBlock) {
+       resolver(GeoLocationManager.shared.getCurrentLocation())
+    }
+    
+    @objc(setConfig:)
+    func setConfig(timeInterval: Double) {
+        GeoLocationManager.setTimeInterval(timeInterval: timeInterval)
+    }
 }
 
 class GeoLocationManager: NSObject {
@@ -65,7 +62,7 @@ class GeoLocationManager: NSObject {
     struct Config {
         let url: String
         let offline: Bool
-        let timeInterval: TimeInterval
+        var timeInterval: TimeInterval
         let token: String
     }
     
@@ -73,6 +70,10 @@ class GeoLocationManager: NSObject {
     
     class func setup(_ config:Config){
         GeoLocationManager.config = config
+    }
+    
+    class func setTimeInterval(timeInterval: Double) {
+        GeoLocationManager.config?.timeInterval = timeInterval
     }
     
     private override init() {
@@ -84,38 +85,77 @@ class GeoLocationManager: NSObject {
         self.timeInterval = config.timeInterval
         self.token = config.token
         super.init()
-        self.start()
     }
     
-    private func start() {
+    func start() -> Bool {
         locationManager = CLLocationManager()
         locationManager?.delegate = self
-        UIDevice.current.isBatteryMonitoringEnabled = true
-        // Step 4: request authorization
-        locationManager?.requestWhenInUseAuthorization()
-        // or
-        locationManager?.requestAlwaysAuthorization()
-        locationManager?.allowsBackgroundLocationUpdates = true
-        locationManager?.activityType = .automotiveNavigation
-        if UIDevice.current.batteryState == .unplugged {
-            locationManager?.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        }else {
-            locationManager?.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        }
-        locationManager?.distanceFilter = 100.0 // 100m
-        locationManager?.startUpdatingLocation()
+        switch CLLocationManager.authorizationStatus() {
         
-        self.timer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(self.sendLocationIfNeeded), userInfo: nil, repeats: true)
-        
-        self.onLocationChanged = { lat, long in
-            //if Double(self.timerValue) > self.timeInterval {
+        case .notDetermined, .restricted, .denied:
+            return false
+        case .authorizedWhenInUse, .authorizedAlways,.authorized:
+            UIDevice.current.isBatteryMonitoringEnabled = true
+            // Step 4: request authorization
+            locationManager?.requestWhenInUseAuthorization()
+            // or
+            locationManager?.requestAlwaysAuthorization()
+            locationManager?.allowsBackgroundLocationUpdates = true
+            locationManager?.activityType = .automotiveNavigation
+            if UIDevice.current.batteryState == .unplugged {
+                locationManager?.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+            }else {
+                locationManager?.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+            }
+            locationManager?.distanceFilter = 100.0 // 100m
+            locationManager?.startUpdatingLocation()
+            
+            self.timer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(self.sendLocationIfNeeded), userInfo: nil, repeats: true)
+            
+            self.onLocationChanged = { lat, long in
+                //if Double(self.timerValue) > self.timeInterval {
                 self.timerValue = 0
                 self.request(with: self.url, offline: false, lat: lat, long: long, completion: { [weak self] result in
                     guard let self = self else { return }
                     self.onServerResponsed(result)
                 })
-            //}
+                //}
+            }
+            return true
+        default:
+            return false
         }
+    }
+    
+    func stop() {
+        locationManager?.delegate = nil
+        locationManager = nil
+    }
+    
+    func getCurrentLocation() -> String? {
+        var currentLoc: CLLocation!
+        if(CLLocationManager.authorizationStatus() == .authorizedWhenInUse ||
+        CLLocationManager.authorizationStatus() == .authorizedAlways) {
+           currentLoc = locationManager?.location
+           print(currentLoc.coordinate.latitude)
+           print(currentLoc.coordinate.longitude)
+           
+           let jsonObject: [String: Any] = [
+               "lat": currentLoc.coordinate.longitude,
+               "lng": currentLoc.coordinate.latitude,
+           ]
+           
+           do {
+               let jsonData = try JSONSerialization.data(withJSONObject: jsonObject, options: JSONSerialization.WritingOptions()) as NSData
+               let jsonString = NSString(data: jsonData as Data, encoding: String.Encoding.utf8.rawValue)! as String
+            return jsonString
+         
+           } catch _ {
+               print ("JSON Failure")
+            return nil
+           }
+        }
+        return nil
     }
     
     @objc func sendLocationIfNeeded() {
