@@ -9,13 +9,8 @@ class Geolocation: NSObject {
         super.init()
     }
 
-    @objc(multiply:withB:withResolver:withRejecter:)
-    func multiply(a: Float, b: Float, resolve:RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) -> Void {
-        resolve(a*b)
-    }
-
-     @objc(getLocation:withB:withResolver:withRejecter:)
-     func getLocation(a: Float, b: Float, resolve:RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) -> Void {
+     @objc(getLocation:)
+     func getLocation(emitter: RCTEventEmitter) -> Void {
          locationManager.requestWhenInUseAuthorization()
          var currentLoc: CLLocation!
          if(CLLocationManager.authorizationStatus() == .authorizedWhenInUse ||
@@ -32,8 +27,8 @@ class Geolocation: NSObject {
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: jsonObject, options: JSONSerialization.WritingOptions()) as NSData
                 let jsonString = NSString(data: jsonData as Data, encoding: String.Encoding.utf8.rawValue)! as String
+                emitter.sendEvent(withName: "JsonResponse", body: jsonString)
           
-                resolve(jsonString)
             } catch _ {
                 print ("JSON Failure")
             }
@@ -41,10 +36,9 @@ class Geolocation: NSObject {
          }
      }
     
-    @objc(getServerResponse:withOffline:withTimeInterval:withResolver:withRejecter:)
-    func getServerResponse(token: String, offline: Bool, timeInterval: Double, resolve:@escaping  RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
-        let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiMTljZTE3ZTk1NTVhYWE2NCIsInN1YiI6OTIsImlzcyI6Imh0dHA6Ly9zdGcuZHJvcC1kZXYuY29tL2FwaS92Mi9sb2dpbiIsImlhdCI6MTYwODAyOTkwOCwiZXhwIjo1MjA4MDI5OTA4LCJuYmYiOjE2MDgwMjk5MDgsImp0aSI6Inl5ajJlSkpyMXpQM0s5WHQifQ.oSUe6whqyR6GcY5IR8wEdisCosZKnYXoyefQ_TG67ZI"
-        GeoLocationManager.setup(.init(url: "https://stg.drop-dev.com/api/v2/positions", offline: false, timeInterval: 10.0, token: token))
+    @objc(getServerResponse:withToken:withOffline:withTimeInterval:withResolver:withRejecter:)
+    func getServerResponse(url: String, token: String, offline: Bool, timeInterval: Double, resolve:@escaping  RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
+        GeoLocationManager.setup(.init(url: url, offline: offline, timeInterval: timeInterval, token: token))
         GeoLocationManager.shared.onServerResponsed = { result in
             resolve(result)
         }
@@ -214,5 +208,3 @@ extension GeoLocationManager: CLLocationManagerDelegate {
         }
     }
 }
-
-

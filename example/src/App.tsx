@@ -7,17 +7,12 @@ export default function App() {
   const [loc, setLoc] = React.useState({});
 
   React.useEffect(() => {
-    Geolocation.multiply(3, 7).then(setResult);
-    Geolocation.getLocation(2, 3).then((res) => {
-      const response = JSON.parse(res);
-      setLoc(response);
-    })
   }, []);
 console.log(result)
   return (
     <View style={styles.container}>
-      <Text>lat: {loc.lat}</Text>
-      <Text>lng: {loc.lng}</Text>
+      <Text>lat: </Text>
+      <Text>lng: </Text>
 
     </View>
   );
