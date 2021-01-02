@@ -26,6 +26,7 @@
 		134814201AA4EA6300B7C361 /* libGeolocation.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libGeolocation.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3E7B5891CC2AC0600A0062D /* Geolocation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Geolocation.m; sourceTree = "<group>"; };
 		E520C8A1259242DD003ED90F /* GeoLocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoLocationManager.swift; sourceTree = "<group>"; };
+		E520CA3025A08979003ED90F /* Reachability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reachability.swift; sourceTree = "<group>"; };
 		F4FF95D5245B92E700C19C63 /* Geolocation-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Geolocation-Bridging-Header.h"; sourceTree = "<group>"; };
 		F4FF95D6245B92E800C19C63 /* Geolocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geolocation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -53,6 +54,7 @@
 			isa = PBXGroup;
 			children = (
 				F4FF95D6245B92E800C19C63 /* Geolocation.swift */,
+				E520CA3025A08979003ED90F /* Reachability.swift */,
 				B3E7B5891CC2AC0600A0062D /* Geolocation.m */,
 				E520C8A1259242DD003ED90F /* GeoLocationManager.swift */,
 				F4FF95D5245B92E700C19C63 /* Geolocation-Bridging-Header.h */,
