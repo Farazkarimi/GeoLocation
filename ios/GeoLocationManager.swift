@@ -59,46 +59,61 @@ class GeoLocationManager: NSObject {
     }
     
     func start() -> Bool {
-        locationManager = CLLocationManager()
-        locationManager?.delegate = self
-        switch CLLocationManager.authorizationStatus() {
+        self.locationManager = CLLocationManager()
+        self.locationManager?.delegate = self
+        _ = self.authorizedLocation()
         
-        case .notDetermined, .restricted, .denied:
-            self.onLocationStatusChanged(.failed)
-            return false
-        case .authorizedWhenInUse, .authorizedAlways,.authorized:
-            UIDevice.current.isBatteryMonitoringEnabled = true
-            // Step 4: request authorization
-            locationManager?.requestWhenInUseAuthorization()
-            // or
-            locationManager?.requestAlwaysAuthorization()
-            locationManager?.allowsBackgroundLocationUpdates = true
-            locationManager?.activityType = .automotiveNavigation
-            if UIDevice.current.batteryState == .unplugged {
-                locationManager?.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-            }else {
-                locationManager?.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        if #available(iOS 14.0, *) {
+            switch locationManager!.authorizationStatus {
+            case .authorizedWhenInUse, .authorizedAlways:
+                return true
+            case .notDetermined, .restricted, .denied:
+                self.onLocationStatusChanged(.failed)
+                return false
+            @unknown default:
+                self.onLocationStatusChanged(.failed)
+                return false
             }
-            locationManager?.distanceFilter = 100.0 // 100m
-            locationManager?.startUpdatingLocation()
-            
-            self.timer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(self.sendLocationIfNeeded), userInfo: nil, repeats: true)
-            
-            self.onLocationChanged = { lat, long in
-                //if Double(self.timerValue) > self.timeInterval {
-                self.timerValue = 0
-                self.request(with: self.url, offline: false, lat: lat, long: long, completion: { [weak self] result in
-                    guard let self = self else { return }
-                    self.onLocationStatusChanged(.success)
-                    self.onServerResponsed(result)
-                })
-                //}
-            }
-            return true
-        default:
-            self.onLocationStatusChanged(.failed)
-            return false
+        } else {
+            switch CLLocationManager.authorizationStatus() {
+            case .authorizedWhenInUse, .authorizedAlways:
+                return authorizedLocation()
+            case .notDetermined, .restricted, .denied:
+                self.onLocationStatusChanged(.failed)
+                return true
+            default:
+                self.onLocationStatusChanged(.failed)
+                return false
+            }        }
+    }
+    
+    private func authorizedLocation() -> Bool {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        // Step 4: request authorization
+        locationManager?.requestAlwaysAuthorization()
+        locationManager?.allowsBackgroundLocationUpdates = true
+        locationManager?.activityType = .automotiveNavigation
+        if UIDevice.current.batteryState == .unplugged {
+            locationManager?.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        }else {
+            locationManager?.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         }
+        locationManager?.distanceFilter = 100.0 // 100m
+        locationManager?.startUpdatingLocation()
+        
+        self.timer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(self.sendLocationIfNeeded), userInfo: nil, repeats: true)
+        
+        self.onLocationChanged = { lat, long in
+            //if Double(self.timerValue) > self.timeInterval {
+            self.timerValue = 0
+            self.request(with: self.url, offline: false, lat: lat, long: long, completion: { [weak self] result in
+                guard let self = self else { return }
+                self.onLocationStatusChanged(.success)
+                self.onServerResponsed(result)
+            })
+            //}
+        }
+        return true
     }
     
     func stop() {
