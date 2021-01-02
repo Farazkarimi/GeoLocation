@@ -7,19 +7,24 @@ class Geolocation: NSObject {
     
     public static var  eventEmitter = RCTEventEmitter()
     let reachability = try! Reachability()
+    
     override init() {
         super.init()
     }
     
     @objc(configure:)
     func configure(object: NSDictionary) {
+        
         guard let obj = object as? [String: Any] else { fatalError("cant parse object") }
         let urlMap = obj["url"] as? String
         let offlineMap = obj["offline"] as? Bool
         let timeIntervalMap = obj["timeInterval"] as? Double
         let tokenMap = obj["token"] as? String
+        
         guard let url = urlMap, let offline = offlineMap, let timeInterval = timeIntervalMap, let token = tokenMap else { fatalError("cant parse object") }
-        GeoLocationManager.setup(.init(url: url, offline: offline, timeInterval: timeInterval, token: token))
+        
+        GeoLocationManager.setup(GeoLocationManager.Config(url: url, offline: offline, timeInterval: timeInterval, token: token))
+        
         httpResponseListener()
         locationStatusListener()
         networkChangeListener()
